@@ -624,3 +624,63 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
 .flat .cell.focus .face { box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.4) !important; }
 .flat #home, .flat #drawer, .flat #cards, .flat .card, .flat #tiles, .flat .tile { will-change: transform; }
 .flat #top { will-change: opacity; }
+
+/* MARK: - Stack layout (layout=stack): status bar, picks, shelf and inputs on one page; no drawer, no top row.
+ * Only transform and opacity still animate; the PS5 tile is a picture (web/icons/ps5-tile), so its focus is a scale,
+ * not the keys' white background. */
+
+.stack #title, .stack #tabs, .stack #buttons, .stack #quotes { display: none; }
+.stack #status { display: block; }
+#status { display: none; }
+
+/* Nothing moves: the inputs are always out, the top never fades, the sky never lifts. */
+.stack.drawer-open #home { -webkit-transform: none; transform: none; }
+.stack.drawer-open #top { opacity: 1; }
+.stack #drawer { -webkit-transform: none; transform: none; opacity: 1; pointer-events: none; }
+.stack #drawer .key { pointer-events: auto; }
+.stack.drawer-open #sky .lift { opacity: 0; }
+.stack #home, .stack #drawer { -webkit-transition: none; transition: none; }
+
+/* The status bar: the clock at the left, the indicators at the right. */
+.stack #clock { display: block; left: 80px; top: 34px; font-size: 44px; font-weight: 500; letter-spacing: -0.01em; line-height: 56px; white-space: nowrap; }
+.stack #clock .date { display: inline; font-size: 26px; font-weight: 500; margin: 0 0 0 18px; color: #6E6E73; vertical-align: 4px; }
+.stack.night #clock .date { color: rgba(245, 245, 247, 0.62); }
+#status { position: absolute; right: 80px; top: 34px; height: 56px; line-height: 56px; font-size: 26px; font-weight: 500; color: #6E6E73; white-space: nowrap; }
+#status .item { display: inline-block; margin-left: 40px; }
+#status .sym { width: 30px; height: 30px; margin-right: 10px; vertical-align: -6px; }
+.night #status { color: rgba(245, 245, 247, 0.7); }
+
+/* The picks: a 380-tall row under the status bar; the wide card 860, the posters 260 (home.js). */
+.stack .card { top: 112px; height: 380px; }
+.stack .card .name { top: 392px; font-size: 29px; }
+.stack .card .meta { top: 430px; font-size: 23px; }
+.stack.no-picks #clock { display: block; }
+
+/* The shelf's store tile: the store symbol, "App Store", and the free storage underneath. */
+.tile.store .sym { position: absolute; left: 50%; top: 10px; width: 34px; height: 34px; margin-left: -17px; color: #FFF; }
+.tile.store .word { top: 47px; margin-top: 0; height: 24px; line-height: 24px; font-size: 21px; }
+.tile.store .free { position: absolute; left: 6%; right: 6%; top: 73px; font-size: 15px; font-weight: 500; text-align: center; color: rgba(255, 255, 255, 0.62); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* The inputs row at the bottom. */
+.stack .row-title { top: 806px; }
+.stack .key { top: 846px; }
+
+/* The PS5 tile: the art fills it, the port and the state in its lower right corner, dimmed when the console is off. */
+.key.ps5 { background: none; box-shadow: none; overflow: visible; }
+.key.ps5 .art { position: absolute; left: 0; top: 0; width: 100%; height: 100%; display: block; }
+.key.ps5 .state {
+  position: absolute;
+  right: 22px;
+  bottom: 9px;
+  font-size: 15px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  color: rgba(255, 255, 255, 0.72);
+  white-space: nowrap;
+}
+.key.ps5.off { opacity: 0.35; }
+.key.ps5.off .state { color: rgba(255, 255, 255, 0.9); }
+.key.ps5.focus { background: none; -webkit-transform: scale(1.07); transform: scale(1.07); box-shadow: 0 16px 34px rgba(0, 0, 0, 0.42); border-radius: 20px; }
+.key.ps5.focus.off { opacity: 0.6; }
+.night .key.ps5 { color: inherit; }
+.stack .key .label { left: 4px; right: 4px; font-size: 20px; }

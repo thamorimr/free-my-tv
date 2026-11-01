@@ -56,6 +56,17 @@
   var stage = $('stage'), body = document.body;
 
   /**
+   * layout=stack (config.properties): everything on one page, top to bottom: a status bar (clock, network, weather,
+   * picks), the picks, the shelf with the TV's app store at its end, and the inputs always in view, where the
+   * PlayStation 5 has its own tile (web/icons/ps5-tile) and the focus when it's on. No drawer: ↓ from the shelf goes
+   * straight to the inputs. The measurements below are the stack's; the classic ones stay where they were.
+   */
+  var STACK = CONFIG.layout === 'stack';
+  if (STACK) setClass(body, 'stack', true);
+  var CARD_WIDE = STACK ? 860 : 1040, CARD_NARROW = STACK ? 260 : 320, CARD_GAP = STACK ? 36 : 40;
+  var SHELF_TOP = STACK ? 580 : 814;
+
+  /**
    * The 1920 × 1080 stage fills the window (on the TV it already is 1920 × 1080). A TV's window only gets shorter for
    * the keyboard (Samsung's resizes it while the city or key field has focus): there the stage keeps its width and the
    * keyboard covers its bottom, as in other apps. Fitted to the short window, it shrank into the top left beside a white
@@ -261,6 +272,15 @@
 
   /** An app's face: its logo on its brand color (or its name, when the icon can't be read). */
   function face(app, box, wordSize) {
+    // The stack's store tile: the store symbol and "App Store" (the TV calls it "Apps"), and the free storage below.
+    if (STACK && TV.isStore(app)) {
+      paint(box, '#3A3A40', '#1C1C20');
+      setClass(box, 'store', true);
+      sym('store', box, 34);
+      el('div', 'word', box, tr('shelf|App Store'));
+      el('div', 'free', box, '');
+      return;
+    }
     var k = shelfKey(app);
     var top = k ? k[3][0] : app.color ? darken(app.color, 0.92) : '#2A2A2E';
     var bottom = k ? k[3][1] : app.color ? darken(app.color, 0.62) : '#161618';
@@ -313,6 +333,17 @@
         }
       }
       if (!out.length) out = apps.slice(0, FEW_APPS);
+    }
+    // The stack keeps the TV's app store at the end of the shelf: one press away from installing more apps.
+    if (STACK) {
+      for (var t = 0; t < apps.length; t++) {
+        if (TV.isStore(apps[t])) {
+          var at = out.indexOf(apps[t]);
+          if (at >= 0) out.splice(at, 1);
+          out.splice(Math.min(SHELF_VISIBLE - 1, out.length), 0, apps[t]);   // in view without scrolling
+          break;
+        }
+      }
     }
     shelf = out;
     others = apps.filter(function (x) { return shelf.indexOf(x) < 0; });
@@ -453,9 +484,9 @@
    * transform and the backdrop's opacity animate: the widths change at once (older TVs).
    */
   function layoutCards() {
-    var holder = $('cards'), nodes = holder.children, left = 80, scroll = Math.max(0, st.card - 2) * 360;
+    var holder = $('cards'), nodes = holder.children, left = 80, scroll = Math.max(0, st.card - 2) * (CARD_NARROW + CARD_GAP);
     for (var i = 0; i < nodes.length; i++) {
-      var wide = i === st.card, w = wide ? 1040 : 320, n = nodes[i], at = left - scroll;
+      var wide = i === st.card, w = wide ? CARD_WIDE : CARD_NARROW, n = nodes[i], at = left - scroll;
       n.style.left = left + 'px';
       n.style.width = w + 'px';
       setClass(n, 'wide', wide);
@@ -464,7 +495,7 @@
         n.setAttribute('data-back', '1');
         n.querySelector('.back').style.backgroundImage = 'url(' + Data.image(cards[i].backdrop, 'w1280') + ')';
       }
-      left += w + 40;
+      left += w + CARD_GAP;
     }
     holder.style.webkitTransform = holder.style.transform = 'translateX(' + (-scroll) + 'px)';
   }
@@ -529,7 +560,7 @@
     platter.style.display = n ? '' : 'none';
     platter.style.left = (left - pad) + 'px';
     platter.style.width = (width + 2 * pad) + 'px';
-    platter.style.top = (814 + 126 - th) + 'px';
+    platter.style.top = (SHELF_TOP + 126 - th) + 'px';
     platter.style.height = (th + 2 * pad) + 'px';
     $('quotes').style.right = (1920 - left - width) + 'px';
     var tiles = $('tiles');
@@ -539,7 +570,7 @@
     shelfFirst = Math.max(0, Math.min(shelfFirst, shelf.length - n));
     for (var i = 0; i < shelf.length; i++) {
       var t = el('div', 'tile', tiles);
-      t.style.top = (854 + 126 - th) + 'px';
+      t.style.top = (SHELF_TOP + 40 + 126 - th) + 'px';
       t.style.width = tw + 'px';
       t.style.height = th + 'px';
       face(shelf[i], t, wordFit(shelf[i].title, tw, 30));
@@ -586,7 +617,67 @@
 
   var drawerItems = [], drawerInputs = 0;
 
+  // MARK: - The stack's inputs row (in place of the drawer): the PS5 tile, the other inputs, the shortcuts
+
+  var ps5At = -1;   // drawerItems index of the PS5 tile, or -1
+
+  /** The input the PlayStation 5 is on: ps5_input, else the HDMI port the TV reports a device on, else HDMI 1. */
+  function ps5Input() {
+    var want = CONFIG.ps5Input || '', i;
+    if (want) { for (i = 0; i < inputs.length; i++) if (inputs[i].key === want) return inputs[i]; }
+    for (i = 0; i < inputs.length; i++) if (/^hdmi\d$/.test(inputs[i].key) && inputs[i].connected) return inputs[i];
+    for (i = 0; i < inputs.length; i++) if (inputs[i].key === 'hdmi1') return inputs[i];
+    return null;
+  }
+
+  function renderInputsRow() {
+    var d = $('drawer'), ps5 = ps5Input();
+    d.innerHTML = '';
+    drawerItems = [];
+    ps5At = -1;
+    for (var i = 0; i < inputs.length; i++) {
+      var x = inputs[i], isPs5 = x === ps5;
+      var label = isPs5 ? 'PlayStation 5' : x.label || tr('Live TV');
+      drawerItems.push({label: label, symbol: isPs5 ? 'gamepad' : x.symbol, off: x.key !== 'live' && !x.connected, ps5: isPs5, port: x.label, run: launcher(x.id, label)});
+    }
+    // The PS5 first in the row, whichever port it's on.
+    for (var p = 0; p < drawerItems.length; p++) if (drawerItems[p].ps5) { drawerItems.unshift(drawerItems.splice(p, 1)[0]); ps5At = 0; break; }
+    drawerInputs = drawerItems.length;
+    drawerItems.push({label: tr('All Apps'), symbol: 'apps', run: openApps});
+    drawerItems.push({label: tr('Home Settings'), symbol: 'settings', run: openSettings});
+    if (TV.canOpenSettings) drawerItems.push({label: tr('TV Settings'), symbol: 'tv_settings', run: tvSettings});
+    var n = drawerItems.length, gap = 18, groupGap = 56, groups = drawerInputs > 0 && drawerInputs < n ? 2 : 1;
+    var psw = ps5At >= 0 ? 422 : 0;   // the PS5 art at the keys' height (3.35:1 at 126)
+    var m = n - (psw ? 1 : 0);   // the keys that share one width
+    var tw = Math.min(230, (1760 - psw - (psw ? gap : 0) - Math.max(0, m - 1) * gap - (groups - 1) * (groupGap - gap)) / Math.max(1, m));
+    var xPos = 80;
+    for (var k = 0; k < n; k++) {
+      if (k === drawerInputs && k > 0) {
+        xPos += groupGap - gap;
+        el('div', 'row-title', d, tr('Shortcuts')).style.left = (xPos + 4) + 'px';
+      }
+      if (k === 0 && drawerInputs) el('div', 'row-title', d, tr('Inputs')).style.left = '84px';
+      var item = drawerItems[k], key = el('div', (item.ps5 ? 'key ps5' : 'key glass') + (item.off ? ' off' : ''), d);
+      key.style.left = xPos + 'px';
+      key.style.width = (item.ps5 ? psw : tw) + 'px';
+      if (item.ps5) {
+        var art = el('img', 'art', key);
+        art.alt = 'PlayStation 5';
+        art.onerror = function () { this.onerror = null; this.src = 'icons/ps5-tile.png'; };   // a TV without WebP
+        art.src = 'icons/ps5-tile.webp';
+        el('div', 'state', key, item.off ? tr('Disconnected') : tr('Connected') + ' · ' + item.port);
+      } else {
+        sym(item.symbol, key);
+        el('div', 'label', key, item.label);
+      }
+      hover(key, Z.DRAWER, k);
+      xPos += (item.ps5 ? psw : tw) + gap;
+    }
+    updateFocus();
+  }
+
   function renderDrawer() {
+    if (STACK) { renderInputsRow(); return; }
     var d = $('drawer');
     d.innerHTML = '';
     drawerItems = [];
@@ -620,6 +711,7 @@
   }
 
   function renderPanels() {
+    if (STACK) return;   // the stack has the weather in its status bar and no prices
     var d = $('drawer');
     var old = d.querySelectorAll('.panel');
     for (var o = 0; o < old.length; o++) d.removeChild(old[o]);
@@ -1344,12 +1436,12 @@
         else if (dy > 0) { openDrawer(); return; }
         else if (dy < 0) {
           if (cards.length) { st.zone = Z.CARDS; st.card = nearest(cardNodes, centerX(tiles[st.shelf])); }
-          else { st.zone = Z.TOP; st.top = Data.hasKey() ? st.tab : 3; }
+          else if (!STACK) { st.zone = Z.TOP; st.top = Data.hasKey() ? st.tab : 3; }   // the stack has no top row
         }
         break;
       case Z.CARDS:
         if (dx) st.card = Math.max(0, Math.min(cards.length - 1, st.card + dx));
-        else if (dy < 0) { st.zone = Z.TOP; st.top = st.tab; }
+        else if (dy < 0) { if (!STACK) { st.zone = Z.TOP; st.top = st.tab; } }
         else if (shelf.length) { st.zone = Z.SHELF; st.shelf = nearest(tiles, centerX(cardNodes[st.card])); }
         break;
       case Z.TOP:
@@ -1406,6 +1498,12 @@
     if (st.zone === Z.KEY) { if (keyAsking) askRemoveKey(false); else closeKey(); return; }
     if (st.zone === Z.ABOUT) { closeAbout(); return; }
     if (sheetOpen()) { closeSheets(); return; }
+    if (STACK) {
+      // Back goes to the resting place (the PS5 when it's on, else the first app); there, it leaves the home screen.
+      if (!atRest()) { rest(); return; }
+      TV.back();
+      return;
+    }
     if (st.zone === Z.DRAWER) { closeDrawer(); return; }
     if (st.zone !== Z.SHELF && shelf.length) { st.zone = Z.SHELF; updateFocus(); return; }
     TV.back();
@@ -1415,10 +1513,10 @@
   function hover(node, zone, index) {
     node.onmouseover = function () {
       if (saverOn || (sheetOpen() !== (zone === Z.APPS || zone === Z.SETTINGS || zone === Z.EDIT || zone === Z.LANG || zone === Z.CITY || zone === Z.KEY || zone === Z.ABOUT))) return;
-      if (zone === Z.DRAWER && st.zone !== Z.DRAWER) return;
-      if (zone !== Z.DRAWER && st.zone === Z.DRAWER && zone !== Z.SHELF) return;
-      if (zone === Z.TOP && index < 3 && !Data.hasKey()) return;   // the tabs are hidden without the picks
-      if (zone === Z.SHELF && st.zone === Z.DRAWER) closeDrawer();
+      if (!STACK && zone === Z.DRAWER && st.zone !== Z.DRAWER) return;
+      if (!STACK && zone !== Z.DRAWER && st.zone === Z.DRAWER && zone !== Z.SHELF) return;
+      if (zone === Z.TOP && (STACK || (index < 3 && !Data.hasKey()))) return;   // the tabs are hidden without the picks
+      if (!STACK && zone === Z.SHELF && st.zone === Z.DRAWER) closeDrawer();
       st.zone = zone;
       if (zone === Z.TOP) { st.top = index; if (index < 3) selectTab(index); }
       else if (zone === Z.CARDS) st.card = index;
@@ -1630,6 +1728,7 @@
     renderShelf();
     renderDrawer();
     renderClock();
+    renderStatus();
     checkNight();
     if (st.zone === Z.SETTINGS) renderSettings();
     updateFocus();
@@ -1672,22 +1771,74 @@
     renderQuotes();
     renderCards();
     renderPanels();
+    renderStatus();
     checkNight();
   });
 
   /** drawer_first: the home screen rests with the drawer open (shelf in the middle, inputs and weather below). */
   function restInDrawer() {
+    if (STACK) { if (st.zone === Z.SHELF) rest(); return; }
     if (!CONFIG.drawerFirst || !drawerItems.length || st.zone !== Z.SHELF) return;
     st.zone = Z.DRAWER;
     st.drawer = 0;
     updateFocus();
   }
 
+  /** The stack's resting place: the PS5 tile when the console is on, else the first app on the shelf. */
+  function ps5On() { return ps5At >= 0 && drawerItems[ps5At] && !drawerItems[ps5At].off; }
+
+  function atRest() {
+    if (ps5On()) return st.zone === Z.DRAWER && st.drawer === ps5At;
+    return st.zone === Z.SHELF && st.shelf === 0;
+  }
+
+  function rest() {
+    if (ps5On()) { st.zone = Z.DRAWER; st.drawer = ps5At; }
+    else { st.zone = Z.SHELF; st.shelf = 0; }
+    updateFocus();
+  }
+
+  // MARK: - The stack's status bar: the clock, the network, the weather, the picks, the free storage on the store tile
+
+  var tvStatus = {network: '', signal: 0, storageFree: 0};
+
+  function readStatus() {
+    if (!STACK) return;
+    TV.status(function (s) { tvStatus = s; renderStatus(); });
+  }
+
+  function renderStatus() {
+    if (!STACK) return;
+    var bar = $('status');
+    bar.innerHTML = '';
+    function item(symbol, text) {
+      var i = el('span', 'item', bar);
+      sym(symbol, i);
+      el('span', '', i, text);
+    }
+    if (tvStatus.network === 'ethernet') item('ethernet', tr('Ethernet'));
+    else if (tvStatus.network === 'wifi') item('wifi', tvStatus.signal >= 0.66 ? tr('Wi-Fi') : trf('Wi-Fi {level}', {level: tvStatus.signal >= 0.33 ? tr('fair') : tr('weak')}));
+    else item('wifi', tr('No network'));
+    var w = Data.weather;
+    if (Prefs.weather() && w) item(Data.symbol(w.code, w.isDay), Data.degrees(w.temp) + '  ·  ' + trf('H:{max}', {max: Data.degrees(w.max)}));
+    var n = Data.picks(TAB_KIND[st.tab]).length;
+    if (n) item('sparkles', trf('{n} trending', {n: n}));
+    // The free storage, on the store tile.
+    var free = document.querySelector('#tiles .store .free');
+    if (free) free.textContent = tvStatus.storageFree ? trf('{n} GB free', {n: decimal(tvStatus.storageFree / 1073741824)}) : '';
+  }
+
+  /** One decimal, with the language's separator (Tizen 2 has no Intl, so not toLocaleString). */
+  function decimal(v) {
+    var comma = /^(pt|es|de|fr|it|nl|pl|ru|uk|tr|sv|da|nb|fi|cs|ro|el|id|vi)/.test(I18N.lang || '');
+    return v.toFixed(1).replace('.', comma ? ',' : '.');
+  }
+
   function reopened() {
     // LG: with handlesRelaunch the app has to come to the front itself, or opening it again while it runs shows nothing.
     if (window.PalmSystem && window.PalmSystem.activate) window.PalmSystem.activate();
     reset();
-    loadApps(function () { renderShelf(); renderDrawer(); restInDrawer(); Data.refresh(); });
+    loadApps(function () { renderShelf(); renderDrawer(); restInDrawer(); renderStatus(); readStatus(); Data.refresh(); });
   }
 
   window.addEventListener('resize', fit);
@@ -1696,7 +1847,7 @@
   document.addEventListener('visibilitychange', function () {
     if (document.hidden) { hideSaver(); hideAmbient(); return; }
     idleAt = Date.now();
-    loadApps(function () { renderShelf(); renderDrawer(); updateFocus(); Data.refresh(); });
+    loadApps(function () { renderShelf(); renderDrawer(); updateFocus(); renderStatus(); readStatus(); Data.refresh(); });
   });
 
   I18N.set(Prefs.language());
@@ -1710,6 +1861,7 @@
   loadApps(function () {
     renderAll();
     restInDrawer();
+    readStatus();
     Data.refresh();
   });
   setInterval(function () {

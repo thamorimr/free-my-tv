@@ -15,7 +15,7 @@ import translate  # noqa: E402  (the catalogues and the keys the web app uses)
 
 GENERIC = {'tmdbKey': '', 'tmdbRegion': '', 'latitude': '', 'longitude': '', 'city': '', 'language': 'auto',
            'currency': '', 'temperature': 'auto', 'theme': 'auto', 'showCrypto': True, 'hideAnimation': False, 'hideApps': [],
-           'shelfApps': [], 'drawerFirst': False, 'openPicksIn': 'apps'}
+           'shelfApps': [], 'drawerFirst': False, 'openPicksIn': 'apps', 'layout': 'classic', 'ps5Input': ''}
 
 
 def config_from_args(args):
@@ -67,6 +67,10 @@ def read_config(path):
         'shelfApps': [s.strip() for s in values.get('shelf_apps', '').split(',') if s.strip()],
         'drawerFirst': values.get('drawer_first', 'false').lower() == 'true',
         'openPicksIn': 'nuvio' if values.get('open_picks_in', '').strip().lower() == 'nuvio' else 'apps',
+        # stack: one page, top to bottom: status bar, picks, shelf (+ the app store), inputs with the PS5 tile.
+        'layout': 'stack' if values.get('layout', '').strip().lower() == 'stack' else 'classic',
+        # hdmi1..hdmi4: the port the PlayStation 5 is on (its tile carries the PS5 art); empty = the connected HDMI.
+        'ps5Input': values.get('ps5_input', '').strip().lower(),
     }
 
 

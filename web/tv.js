@@ -211,7 +211,7 @@ var TV = (function () {
     ['com.disney.disneyplus-prod', 'Disney+', '#1838C8'], ['com.hbo.hbomax', 'Max', '#6C3BE0'],
     ['com.apple.appletv', 'Apple TV', '#B8BCC6'], ['globoplaywebos', 'Globoplay', '#FF5A1F'], ['spotify-beehive', 'Spotify', '#1DB954'],
     ['cdp-30', 'Plex', '#E5A00D'], ['com.crunchyroll.webapp', 'Crunchyroll', '#F47521'], ['com.webos.app.browser', 'Web Browser', '#3A7BD5'],
-    ['com.palm.app.settings', 'Settings', '#8E8E93']
+    ['com.palm.app.settings', 'Settings', '#8E8E93'], ['com.samsung.tv.store', 'Apps', '#2B2B30']
   ];
 
   // Newer webOS (11 tested) denies listLaunchPoints to Developer Mode apps, but still answers getAppLoadStatus for
@@ -420,6 +420,61 @@ var TV = (function () {
     }
   }
 
+  // MARK: - Status (the stack layout's status bar): the network and the free storage
+
+  /**
+   * done({network: 'wifi' | 'ethernet' | '', signal: 0..1, storageFree: bytes or 0}). Samsung: one read of
+   * tizen.systeminfo's ETHERNET_NETWORK, WIFI_NETWORK and STORAGE, no listeners (nothing stays registered). LG: the
+   * connection manager. A browser: a stand-in.
+   */
+  function status(done) {
+    var out = {network: '', signal: 0, storageFree: 0}, left = 1, sent = false;
+    function wait() { left++; }
+    function finish() {
+      if (--left > 0 || sent) return;
+      sent = true;
+      clearTimeout(timer);
+      done(out);
+    }
+    var timer = setTimeout(function () { left = 1; finish(); }, 3000);
+    if (samsung) {
+      var info = window.tizen.systeminfo;
+      var property = function (name, got) {
+        wait();
+        try {
+          info.getPropertyValue(name, function (v) { try { got(v); } catch (e) {} finish(); }, function () { finish(); });
+        } catch (e) {
+          finish();
+        }
+      };
+      property('ETHERNET_NETWORK', function (v) {
+        if (v.status === 'ON') { out.network = 'ethernet'; out.signal = 1; }
+      });
+      property('WIFI_NETWORK', function (v) {
+        if (v.status === 'ON' && out.network !== 'ethernet') { out.network = 'wifi'; out.signal = +v.signalStrength || 0; }
+      });
+      property('STORAGE', function (v) {
+        var units = v.units || [];
+        for (var i = 0; i < units.length; i++) {
+          if (units[i].type === 'INTERNAL') { out.storageFree = +units[i].availableCapacity || 0; break; }
+        }
+      });
+    } else if (webos) {
+      wait();
+      luna('luna://com.palm.connectionmanager/getStatus', {}, function (res) {
+        if (res) {
+          var wired = res.wired || {}, wifi = res.wifi || {};
+          if (wired.state === 'connected') { out.network = 'ethernet'; out.signal = 1; }
+          else if (wifi.state === 'connected') { out.network = 'wifi'; out.signal = 1; }
+        }
+        finish();
+      });
+    } else {
+      out = {network: 'wifi', signal: 0.8, storageFree: 4.2 * 1024 * 1024 * 1024};
+    }
+    finish();
+  }
+
   // MARK: - About this TV
 
   /** done({model, firmware, system, version, ip}), with '' for what the TV doesn't tell. */
@@ -604,6 +659,14 @@ var TV = (function () {
 
     /** The TV's model, firmware, system, IP address and this app's version, for About this TV. */
     about: about,
+
+    /** The network and the free storage, for the stack layout's status bar. */
+    status: status,
+
+    /** The TV's own app store, when it's among the apps: Samsung's Apps (com.samsung.tv.store), LG's Content Store. */
+    isStore: function (app) {
+      return /^com\.samsung\.tv\.store$|^com\.webos\.app\.(store|discovery)$/.test(app.id) || /^(apps|app store|lg content store)$/i.test(app.title);
+    },
 
     /** LG: keeps the TV's screensaver away while ours will take over (`hold` says when). */
     holdScreenSaver: holdScreenSaver,
