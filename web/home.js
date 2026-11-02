@@ -1818,7 +1818,7 @@
     }
     if (tvStatus.network === 'ethernet') item('ethernet', tr('Ethernet'));
     else if (tvStatus.network === 'wifi') item('wifi', tvStatus.signal >= 0.66 ? tr('Wi-Fi') : trf('Wi-Fi {level}', {level: tvStatus.signal >= 0.33 ? tr('fair') : tr('weak')}));
-    else item('wifi', tr('No network'));
+    else if (tvStatus.network === 'none') item('wifi', tr('No network'));   // unknown: nothing, rather than a wrong "no network"
     var w = Data.weather;
     if (Prefs.weather() && w) item(Data.symbol(w.code, w.isDay), Data.degrees(w.temp) + '  ·  ' + trf('H:{max}', {max: Data.degrees(w.max)}));
     var n = Data.picks(TAB_KIND[st.tab]).length;

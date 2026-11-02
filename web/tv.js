@@ -423,7 +423,7 @@ var TV = (function () {
   // MARK: - Status (the stack layout's status bar): the network and the free storage
 
   /**
-   * done({network: 'wifi' | 'ethernet' | '', signal: 0..1, storageFree: bytes or 0}). Samsung: one read of
+   * done({network: 'wifi' | 'ethernet' | 'none' | '' (unknown), signal: 0..1, storageFree: bytes or 0}). Samsung: one read of
    * tizen.systeminfo's ETHERNET_NETWORK, WIFI_NETWORK and STORAGE, no listeners (nothing stays registered). LG: the
    * connection manager. A browser: a stand-in.
    */
@@ -447,11 +447,17 @@ var TV = (function () {
           finish();
         }
       };
-      property('ETHERNET_NETWORK', function (v) {
-        if (v.status === 'ON') { out.network = 'ethernet'; out.signal = 1; }
+      // NETWORK needs no privilege: its networkType is WIFI, ETHERNET, 2G…, NONE or UNKNOWN. A 2025 U8600F (Tizen 9)
+      // answered WIFI_NETWORK with nothing ("No network" beside a forecast that had just arrived), so the type comes
+      // from NETWORK and WIFI_NETWORK only adds the signal strength when it answers.
+      property('NETWORK', function (v) {
+        var t = String(v.networkType || '').toUpperCase();
+        if (t === 'ETHERNET') { out.network = 'ethernet'; out.signal = 1; }
+        else if (t === 'NONE') out.network = 'none';
+        else if (t && t !== 'UNKNOWN') { out.network = 'wifi'; out.signal = 1; }
       });
       property('WIFI_NETWORK', function (v) {
-        if (v.status === 'ON' && out.network !== 'ethernet') { out.network = 'wifi'; out.signal = +v.signalStrength || 0; }
+        if (v.status === 'ON' && out.network !== 'ethernet') { out.network = 'wifi'; out.signal = +v.signalStrength || 1; }
       });
       property('STORAGE', function (v) {
         var units = v.units || [];
