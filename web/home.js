@@ -58,7 +58,7 @@
   /**
    * layout=stack (config.properties): everything on one page, top to bottom: a status bar (clock, network, weather,
    * picks), the picks, the shelf with the TV's app store at its end, and the inputs always in view, where the
-   * PlayStation 5 has its own tile (web/icons/ps5-tile) and the focus when it's on. No drawer: ↓ from the shelf goes
+   * PlayStation 5 has its own tile (the PS mark from web/icons/ps-symbol.png) and the focus when it's on. No drawer: ↓ from the shelf goes
    * straight to the inputs. The measurements below are the stack's; the classic ones stay where they were.
    */
   var STACK = CONFIG.layout === 'stack';
@@ -647,7 +647,7 @@
     drawerItems.push({label: tr('Home Settings'), symbol: 'settings', run: openSettings});
     if (TV.canOpenSettings) drawerItems.push({label: tr('TV Settings'), symbol: 'tv_settings', run: tvSettings});
     var n = drawerItems.length, gap = 18, groupGap = 56, groups = drawerInputs > 0 && drawerInputs < n ? 2 : 1;
-    var psw = ps5At >= 0 ? 422 : 0;   // the PS5 art at the keys' height (3.35:1 at 126)
+    var psw = ps5At >= 0 ? 340 : 0;   // the PS5 tile: a glass key like the others, wide enough for its name and state
     var m = n - (psw ? 1 : 0);   // the keys that share one width
     var tw = Math.min(230, (1760 - psw - (psw ? gap : 0) - Math.max(0, m - 1) * gap - (groups - 1) * (groupGap - gap)) / Math.max(1, m));
     var xPos = 80;
@@ -657,15 +657,16 @@
         el('div', 'row-title', d, tr('Shortcuts')).style.left = (xPos + 4) + 'px';
       }
       if (k === 0 && drawerInputs) el('div', 'row-title', d, tr('Inputs')).style.left = '84px';
-      var item = drawerItems[k], key = el('div', (item.ps5 ? 'key ps5' : 'key glass') + (item.off ? ' off' : ''), d);
+      var item = drawerItems[k], key = el('div', 'key glass' + (item.ps5 ? ' ps5' : '') + (item.off ? ' off' : ''), d);
       key.style.left = xPos + 'px';
       key.style.width = (item.ps5 ? psw : tw) + 'px';
       if (item.ps5) {
-        var art = el('img', 'art', key);
-        art.alt = 'PlayStation 5';
-        art.onerror = function () { this.onerror = null; this.src = 'icons/ps5-tile.png'; };   // a TV without WebP
-        art.src = 'icons/ps5-tile.webp';
-        el('div', 'state', key, item.off ? tr('Disconnected') : tr('Connected') + ' · ' + item.port);
+        var mark = el('img', 'mark', key);
+        mark.alt = '';
+        mark.src = 'icons/ps-symbol.png';
+        var text = el('div', 'text', key);
+        el('div', 'name', text, item.label);
+        el('div', 'state', text, item.off ? tr('Disconnected') : tr('Connected') + ' · ' + item.port);
       } else {
         sym(item.symbol, key);
         el('div', 'label', key, item.label);

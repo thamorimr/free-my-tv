@@ -626,8 +626,8 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
 .flat #top { will-change: opacity; }
 
 /* MARK: - Stack layout (layout=stack): status bar, picks, shelf and inputs on one page; no drawer, no top row.
- * Only transform and opacity still animate; the PS5 tile is a picture (web/icons/ps5-tile), so its focus is a scale,
- * not the keys' white background. */
+ * Only transform and opacity still animate. The PS5 tile is a glass key like the others, with the PS mark
+ * (web/icons/ps-symbol.png) and the name and the state beside it. */
 
 .stack #title, .stack #tabs, .stack #buttons, .stack #quotes { display: none; }
 .stack #status { display: block; }
@@ -665,22 +665,11 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
 .stack .row-title { top: 806px; }
 .stack .key { top: 846px; }
 
-/* The PS5 tile: the art fills it, the port and the state in its lower right corner, dimmed when the console is off. */
-.key.ps5 { background: none; box-shadow: none; overflow: visible; }
-.key.ps5 .art { position: absolute; left: 0; top: 0; width: 100%; height: 100%; display: block; }
-.key.ps5 .state {
-  position: absolute;
-  right: 22px;
-  bottom: 9px;
-  font-size: 15px;
-  font-weight: 500;
-  letter-spacing: 0.02em;
-  color: rgba(255, 255, 255, 0.72);
-  white-space: nowrap;
-}
-.key.ps5.off { opacity: 0.35; }
-.key.ps5.off .state { color: rgba(255, 255, 255, 0.9); }
-.key.ps5.focus { background: none; -webkit-transform: scale(1.07); transform: scale(1.07); box-shadow: 0 16px 34px rgba(0, 0, 0, 0.42); border-radius: 20px; }
-.key.ps5.focus.off { opacity: 0.6; }
-.night .key.ps5 { color: inherit; }
+/* The PS5 tile: a glass key like the others, the PS mark at the left, the name and the state beside it. */
+.key.ps5 { text-align: left; }
+.key.ps5 .mark { position: absolute; left: 26px; top: 39px; width: 48px; height: 48px; }
+.key.ps5 .text { position: absolute; left: 94px; right: 16px; top: 34px; }
+.key.ps5 .name { font-size: 25px; font-weight: 600; letter-spacing: -0.01em; line-height: 30px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.key.ps5 .state { margin-top: 4px; font-size: 15px; font-weight: 500; letter-spacing: 0.02em; opacity: 0.6; white-space: nowrap; }
+.key.ps5.off .mark { opacity: 0.4; }
 .stack .key .label { left: 4px; right: 4px; font-size: 20px; }
